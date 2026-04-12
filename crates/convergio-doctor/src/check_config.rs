@@ -45,7 +45,11 @@ pub fn check_config_valid() -> (CheckStatus, String) {
 
 fn resolve_config_path() -> Option<std::path::PathBuf> {
     if let Ok(p) = std::env::var("CONVERGIO_CONFIG") {
-        let path = std::path::PathBuf::from(p);
+        let path = std::path::PathBuf::from(&p);
+        // Canonicalize to resolve symlinks and prevent path tricks
+        if let Ok(canonical) = path.canonicalize() {
+            return Some(canonical);
+        }
         if path.exists() {
             return Some(path);
         }
