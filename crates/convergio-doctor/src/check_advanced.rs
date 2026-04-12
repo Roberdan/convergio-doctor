@@ -1,7 +1,7 @@
 //! Advanced doctor checks — dependency graph, migrations, scheduled tasks.
 //!
-//! Each check returns (CheckStatus, String) for use with `run_check()`.
-//! Config validation lives in check_config.rs.
+//! Each check returns `(CheckStatus, String)` for use with `run_check()`.
+//! Config validation lives in `check_config.rs`.
 
 use crate::checks::{run_check, CheckResult, CheckStatus};
 use crate::runtime::DoctorRuntime;
