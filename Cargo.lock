@@ -355,8 +355,8 @@ dependencies = [
 
 [[package]]
 name = "convergio-mcp"
-version = "0.1.1"
-source = "git+https://github.com/Roberdan/convergio-mcp?tag=convergio-mcp-v0.1.1#e0d4557fee8cc73a8d5ea9044fdcc5329b7be94b"
+version = "0.1.4"
+source = "git+https://github.com/Roberdan/convergio-mcp?tag=convergio-mcp-v0.1.4#7b6a04fb34e44a45fda8d932d11936ef8b5d3e11"
 dependencies = [
  "anyhow",
  "clap",
