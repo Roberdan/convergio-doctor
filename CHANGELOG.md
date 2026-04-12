@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.1...convergio-doctor-v0.1.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* **security:** harden doctor against injection, SSRF, traversal, and secret exposure ([#4](https://github.com/Roberdan/convergio-doctor/issues/4)) ([38e44c2](https://github.com/Roberdan/convergio-doctor/commit/38e44c2424a69e6b29918f2ffa8792743e99b31f))
+
 ## [0.1.1](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.0...convergio-doctor-v0.1.1) (2026-04-12)
 
 
