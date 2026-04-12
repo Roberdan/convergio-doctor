@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["crates/convergio-doctor"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Convergio-Community"
+repository = "https://github.com/Roberdan/convergio-doctor"
+
+[workspace.dependencies]
+# SDK dependencies (tag aligned with convergio-depgraph v0.1.2 to share types)
+convergio-sdk = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.7" }
+convergio-types = { git = "https://github.com/Roberdan/convergio-sdk", tag = "convergio-sdk-v0.1.6" }
+convergio-db = { git = "https://github.com/Roberdan/convergio-sdk", tag = "convergio-sdk-v0.1.6" }
+
+# Convergio ecosystem
+convergio-depgraph = { git = "https://github.com/Roberdan/convergio-depgraph", tag = "v0.1.2" }
+convergio-mcp = { git = "https://github.com/Roberdan/convergio-mcp", tag = "convergio-mcp-v0.1.1" }
+
+# Common deps
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.44", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "fs", "io-util"] }
+tracing = "0.1"
+axum = { version = "0.7", features = ["ws", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+rusqlite = { version = "0.32", features = ["bundled", "functions"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.25"
+toml = "0.8"
+dirs = "6"
