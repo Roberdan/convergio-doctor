@@ -119,9 +119,14 @@ pub fn purge_all_doctor_data(client: &DoctorHttpClient) -> (usize, Vec<String>) 
 
 /// Check if a peer is reachable via HTTP health endpoint.
 pub fn check_peer_online(base_url: &str) -> bool {
+    // SSRF mitigation: only allow http(s)
+    if !base_url.starts_with("http://") && !base_url.starts_with("https://") {
+        return false;
+    }
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(3))
         .timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
         .build();
     let Ok(client) = client else { return false };
     let url = format!("{base_url}/api/health");
@@ -193,6 +198,10 @@ pub fn cleanup_test_data(pool: &convergio_db::pool::ConnPool) -> (usize, Vec<Str
         .unwrap_or_default();
 
     for table in &table_names {
+        // Sanitize: SQLite identifiers must be alphanumeric/underscore only
+        if !table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            continue;
+        }
         let Ok(mut info) = conn.prepare(&format!("PRAGMA table_info(\"{table}\")")) else {
             continue;
         };
@@ -212,6 +221,10 @@ pub fn cleanup_test_data(pool: &convergio_db::pool::ConnPool) -> (usize, Vec<Str
             .unwrap_or_default();
 
         for col in &text_cols {
+            // Sanitize column names
+            if !col.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                continue;
+            }
             let sql = format!(
                 "DELETE FROM \"{table}\" WHERE \"{col}\" LIKE '%{TEST_PREFIX}%' \
                  OR \"{col}\" LIKE '%{TEST_SLUG_PREFIX}%'"

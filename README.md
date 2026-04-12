@@ -9,6 +9,18 @@ CRATE_DESCRIPTION
 
 Part of the [Convergio](https://github.com/Roberdan/convergio) ecosystem.
 
+## Security
+
+convergio-doctor runs privileged diagnostics. Security hardening includes:
+
+- **Command injection protection** — peer addresses validated before SSH execution
+- **SSRF mitigation** — HTTP clients restricted to `http(s)://`, redirects disabled
+- **Path traversal prevention** — `..` sequences rejected, paths canonicalized
+- **Secret redaction** — diagnostic output sanitized before persistence
+- **SQL identifier validation** — dynamic table/column names validated
+
+See [ADR-037](docs/adr/ADR-037-audit-security-fixes.md) for full details.
+
 ## Architecture
 
 ```mermaid

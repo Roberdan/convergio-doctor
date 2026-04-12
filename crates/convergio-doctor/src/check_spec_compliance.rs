@@ -197,12 +197,29 @@ fn check_file_created(task: &TaskInfo, text: &str, root: &Path, out: &mut Vec<St
                 .next()
                 .unwrap_or("")
                 .trim_matches(|c: char| c == '`' || c == '\'' || c == '"');
-            if candidate.contains('/') && candidate.contains('.') && !root.join(candidate).exists()
-            {
-                out.push(format!(
-                    "[WARN] task '{}' (plan '{}') mentions creating `{candidate}` but not found",
-                    task.title, task.plan_name,
-                ));
+            // Path traversal mitigation: reject candidates that escape the workspace
+            if candidate.contains("..") {
+                continue;
+            }
+            let full = root.join(candidate);
+            let Ok(canonical_root) = root.canonicalize() else {
+                continue;
+            };
+            // Only check existence if the resolved path stays within the workspace root
+            if candidate.contains('/') && candidate.contains('.') {
+                if full
+                    .canonicalize()
+                    .map(|p| !p.starts_with(&canonical_root))
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                if !full.exists() {
+                    out.push(format!(
+                        "[WARN] task '{}' (plan '{}') mentions creating `{candidate}` but not found",
+                        task.title, task.plan_name,
+                    ));
+                }
             }
         }
     }

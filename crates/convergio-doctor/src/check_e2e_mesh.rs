@@ -214,6 +214,16 @@ fn check_mesh_sync_roundtrip(pool: &ConnPool) -> CheckResult {
     })
 }
 
+/// Validate that a peer address is a safe IP/hostname (no shell meta-characters).
+fn is_safe_peer_addr(addr: &str) -> bool {
+    !addr.is_empty()
+        && addr.len() <= 253
+        && addr
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == ':' || c == '-')
+        && !addr.starts_with('-')
+}
+
 fn check_delegation_ssh_connectivity() -> CheckResult {
     run_check("delegation_ssh_connectivity", "e2e", || {
         let client = DoctorHttpClient::new();
@@ -222,13 +232,20 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
             return (CheckStatus::Warn, "No peers for SSH check".into());
         }
         let mut ok = 0;
+        let mut skipped = 0;
         for (ip, _name) in &peers {
+            if !is_safe_peer_addr(ip) {
+                skipped += 1;
+                continue;
+            }
             let output = std::process::Command::new("ssh")
                 .args([
                     "-o",
                     "ConnectTimeout=3",
                     "-o",
                     "BatchMode=yes",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
                     ip,
                     "echo ok",
                 ])
@@ -237,6 +254,12 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
                 Ok(o) if o.status.success() => ok += 1,
                 _ => {}
             }
+        }
+        if skipped > 0 {
+            return (
+                CheckStatus::Warn,
+                format!("{skipped} peers skipped (invalid address)"),
+            );
         }
         if ok > 0 {
             (
@@ -253,9 +276,8 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
 }
 
 fn trunc(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
+    match s.char_indices().nth(max) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
     }
 }

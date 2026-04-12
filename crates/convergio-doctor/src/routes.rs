@@ -241,9 +241,32 @@ async fn get_history(pool: ConnPool) -> Json<Value> {
     Json(json!({"reports": get_history_rows(&pool)}))
 }
 
+/// Patterns that may indicate secrets in diagnostic messages.
+const SECRET_PATTERNS: &[&str] = &[
+    "token=",
+    "password=",
+    "secret=",
+    "api_key=",
+    "apikey=",
+    "bearer ",
+    "authorization:",
+];
+
+fn sanitize_report(report: &DoctorReport) -> DoctorReport {
+    let mut sanitized = report.clone();
+    for check in &mut sanitized.checks {
+        let lower = check.message.to_lowercase();
+        if SECRET_PATTERNS.iter().any(|p| lower.contains(p)) {
+            check.message = "[REDACTED — potential secret in output]".into();
+        }
+    }
+    sanitized
+}
+
 fn save_report(pool: &ConnPool, report: &DoctorReport) {
     let Ok(conn) = pool.get() else { return };
-    let json_str = serde_json::to_string(report).unwrap_or_default();
+    let clean = sanitize_report(report);
+    let json_str = serde_json::to_string(&clean).unwrap_or_default();
     let _ = conn.execute(
         "INSERT INTO doctor_reports \
          (version, daemon_version, total_checks, passed, warnings, failed, duration_ms, report_json) \

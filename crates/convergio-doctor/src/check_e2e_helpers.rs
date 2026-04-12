@@ -36,14 +36,22 @@ impl DoctorHttpClient {
     }
 
     pub fn with_base(url: &str) -> Self {
+        let sanitized = url.trim_end_matches('/').to_string();
+        // SSRF mitigation: only allow http(s) scheme and reject obviously
+        // crafted URLs (file://, ftp://, gopher://, etc.)
+        assert!(
+            sanitized.starts_with("http://") || sanitized.starts_with("https://"),
+            "DoctorHttpClient: only http(s) URLs are allowed, got: {sanitized}"
+        );
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(5))
             .timeout(std::time::Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("HTTP client");
         Self {
             client,
-            base_url: url.trim_end_matches('/').to_string(),
+            base_url: sanitized,
             token: std::env::var("CONVERGIO_AUTH_TOKEN").unwrap_or_else(|_| "dev-local".into()),
         }
     }

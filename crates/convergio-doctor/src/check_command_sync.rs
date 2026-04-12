@@ -47,6 +47,16 @@ pub fn check_command_sync() -> CheckResult {
                 continue; // No source to check
             }
 
+            // Path traversal mitigation: reject traversal sequences
+            if source.contains("..") {
+                issues.push(format!(
+                    "{}: source '{}' contains path traversal",
+                    path.file_name().unwrap_or_default().to_string_lossy(),
+                    source
+                ));
+                continue;
+            }
+
             checked += 1;
             let source_path = Path::new(source);
             if !source_path.exists() {

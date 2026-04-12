@@ -188,9 +188,8 @@ fn check_chaos_net_concurrent_requests() -> CheckResult {
 }
 
 fn trunc(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
+    match s.char_indices().nth(max) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
     }
 }
