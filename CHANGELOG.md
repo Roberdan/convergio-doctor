@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.3...convergio-doctor-v0.1.4) (2026-04-12)
+
+
+### Bug Fixes
+
+* bump convergio-depgraph v0.1.4 to align SDK types with v0.1.9 ([b57447c](https://github.com/Roberdan/convergio-doctor/commit/b57447c563eebde1cfff010d535a435fb1872f54))
+
 ## [0.1.3](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.2...convergio-doctor-v0.1.3) (2026-04-12)
 
 
