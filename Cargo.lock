@@ -304,8 +304,8 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "convergio-db"
-version = "0.1.6"
-source = "git+https://github.com/Roberdan/convergio-sdk?tag=convergio-sdk-v0.1.6#175aaec0da0e1fe3f6d1384ca0c6d259c12db268"
+version = "0.1.7"
+source = "git+https://github.com/Roberdan/convergio-sdk?tag=v0.1.7#8d9c143cd5a6c16be5eb274cc09b2540307b620a"
 dependencies = [
  "chrono",
  "convergio-types",
@@ -320,7 +320,7 @@ dependencies = [
 [[package]]
 name = "convergio-depgraph"
 version = "0.1.1"
-source = "git+https://github.com/Roberdan/convergio-depgraph?tag=v0.1.2#edefd29e5093dcb8b1991abe419cd9822ce20b04"
+source = "git+https://github.com/Roberdan/convergio-depgraph?tag=v0.1.3#ceced71f5cc7c12a0df11ed73375ae5a7fcbf766"
 dependencies = [
  "axum",
  "convergio-types",
@@ -374,8 +374,8 @@ dependencies = [
 
 [[package]]
 name = "convergio-types"
-version = "0.1.6"
-source = "git+https://github.com/Roberdan/convergio-sdk?tag=convergio-sdk-v0.1.6#175aaec0da0e1fe3f6d1384ca0c6d259c12db268"
+version = "0.1.7"
+source = "git+https://github.com/Roberdan/convergio-sdk?tag=v0.1.7#8d9c143cd5a6c16be5eb274cc09b2540307b620a"
 dependencies = [
  "axum",
  "chrono",
