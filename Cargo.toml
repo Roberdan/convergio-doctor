@@ -10,9 +10,9 @@ repository = "https://github.com/Roberdan/convergio-doctor"
 
 [workspace.dependencies]
 # SDK dependencies (tag aligned with convergio-depgraph v0.1.2 to share types)
-convergio-sdk = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.7" }
-convergio-types = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.7" }
-convergio-db = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.7" }
+convergio-sdk = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9" }
+convergio-types = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9" }
+convergio-db = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9" }
 
 # Convergio ecosystem
 convergio-depgraph = { git = "https://github.com/Roberdan/convergio-depgraph", tag = "v0.1.3" }
