@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.2...convergio-doctor-v0.1.3) (2026-04-12)
+
+
+### Documentation
+
+* add .env.example with required environment variables ([#6](https://github.com/Roberdan/convergio-doctor/issues/6)) ([e6fcb32](https://github.com/Roberdan/convergio-doctor/commit/e6fcb324f45099478af2d3c1b3a022184a2cbdc9))
+
 ## [0.1.2](https://github.com/Roberdan/convergio-doctor/compare/convergio-doctor-v0.1.1...convergio-doctor-v0.1.2) (2026-04-12)
 
 
