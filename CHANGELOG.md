@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/Roberdan/convergio-doctor/compare/v0.1.7...v0.1.8) (2026-04-13)
+
+
+### Bug Fixes
+
+* update Cargo.lock for crates.io deps ([42c7506](https://github.com/Roberdan/convergio-doctor/commit/42c75068fadc47fa46d87caa2e7c4db734201f84))
+
 ## [0.1.7](https://github.com/Roberdan/convergio-doctor/compare/v0.1.6...v0.1.7) (2026-04-13)
 
 
