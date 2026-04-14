@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/Roberdan/convergio-doctor/compare/v0.1.8...v0.1.9) (2026-04-14)
+
+
+### Bug Fixes
+
+* pass CARGO_REGISTRY_TOKEN to release workflow ([d85f3a2](https://github.com/Roberdan/convergio-doctor/commit/d85f3a266a4809442a55e0e6f75735ddc3685742))
+
 ## [0.1.8](https://github.com/Roberdan/convergio-doctor/compare/v0.1.7...v0.1.8) (2026-04-13)
 
 
