@@ -357,9 +357,9 @@ dependencies = [
 
 [[package]]
 name = "convergio-mcp"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35ee6647723eeab5ad493e10527a75a49646644c3e7ff99fe110c7e274421c80"
+checksum = "99cb46287a26ebdedda59a51bb14b6c395fbcbd498717358b3dd788120965dfd"
 dependencies = [
  "anyhow",
  "clap",
