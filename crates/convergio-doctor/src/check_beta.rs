@@ -213,7 +213,22 @@ fn check_mesh_node_sync(pool: &convergio_db::pool::ConnPool) -> CheckResult {
 /// Verify that the installed `cvg` CLI version matches the daemon version.
 fn check_cli_version_match() -> CheckResult {
     run_check("cli_version_match", "beta", || {
-        let daemon_version = env!("CARGO_PKG_VERSION");
+        // Compare CLI version against the running daemon (via HTTP), not
+        // against this crate's compile-time version — they are different
+        // crates with independent version numbers since the workspace split.
+        let daemon_version = match std::process::Command::new("cvg")
+            .args(["health", "--json"])
+            .output()
+        {
+            Ok(o) if o.status.success() => {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                serde_json::from_str::<serde_json::Value>(&stdout)
+                    .ok()
+                    .and_then(|v| v["version"].as_str().map(String::from))
+            }
+            _ => None,
+        };
+
         let cli_output = std::process::Command::new("cvg")
             .args(["--version"])
             .output();
@@ -221,19 +236,26 @@ fn check_cli_version_match() -> CheckResult {
             Ok(o) if o.status.success() => {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 let cli_version = stdout.split_whitespace().last().unwrap_or("").trim();
-                if cli_version == daemon_version {
-                    (
+                if cli_version.is_empty() {
+                    return (CheckStatus::Fail, "cvg --version returned empty".into());
+                }
+                // If we can reach the daemon, compare; otherwise just confirm CLI works
+                match daemon_version {
+                    Some(dv) if cli_version == dv => (
                         CheckStatus::Pass,
-                        format!("cvg {cli_version} matches daemon {daemon_version}"),
-                    )
-                } else {
-                    (
+                        format!("cvg {cli_version} matches daemon {dv}"),
+                    ),
+                    Some(dv) => (
                         CheckStatus::Fail,
                         format!(
-                            "cvg={cli_version} != daemon={daemon_version} — \
+                            "cvg={cli_version} != daemon={dv} — \
                              run: cargo install --path crates/convergio-cli --force"
                         ),
-                    )
+                    ),
+                    None => (
+                        CheckStatus::Pass,
+                        format!("cvg {cli_version} installed (daemon version unknown)"),
+                    ),
                 }
             }
             Ok(_) => (
