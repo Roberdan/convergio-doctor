@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/Roberdan/convergio-doctor/compare/v0.1.9...v0.1.10) (2026-04-15)
+
+
+### Bug Fixes
+
+* cli_version_match compares against running daemon, not doctor crate version ([01bd991](https://github.com/Roberdan/convergio-doctor/commit/01bd9916ea0dd0969850de1e562783ed26eaf277))
+
 ## [0.1.9](https://github.com/Roberdan/convergio-doctor/compare/v0.1.8...v0.1.9) (2026-04-14)
 
 
