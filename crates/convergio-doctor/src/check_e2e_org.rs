@@ -90,8 +90,9 @@ fn check_agents_catalog_crud() -> CheckResult {
             return (CheckStatus::Fail, format!("create agent returned {status}"));
         }
 
-        // Verify in list
-        match client.get("/api/agents/catalog") {
+        // Verify via exact-name filter (default list is capped at 20, so
+        // a newly created `_doctor_test_*` name falls outside the page).
+        match client.get(&format!("/api/agents/catalog?name={name}")) {
             Ok((200, body)) if body.to_string().contains(&name) => {}
             Ok((200, _)) => return (CheckStatus::Warn, "agent created but not in list".into()),
             _ => {}
@@ -139,11 +140,15 @@ fn check_prompts_crud() -> CheckResult {
 fn check_skills_crud() -> CheckResult {
     run_check("skills_crud", "e2e", || {
         let client = DoctorHttpClient::new();
-        let name = test_name("skill");
+        let agent = test_name("skill");
+        // search_skills in convergio-prompts filters out `_doctor_test%`
+        // capabilities to keep real searches clean, so use the slug-prefixed
+        // form (still cleaned up via `doctor-test-` matcher).
+        let capability = format!("doctor-test-cap-{}", crate::check_e2e_helpers::ts_ms());
 
         let (status, _) = match client.post_json(
             "/api/skills",
-            &json!({"agent": name, "host": "localhost", "capability": name, "confidence": 0.9, "description": "doctor test skill"}),
+            &json!({"agent": agent, "host": "localhost", "capability": capability, "confidence": 0.9, "description": "doctor test skill"}),
         ) {
             Ok(r) => r,
             Err(e) => return (CheckStatus::Fail, format!("create skill failed: {e}")),
@@ -152,9 +157,10 @@ fn check_skills_crud() -> CheckResult {
             return (CheckStatus::Warn, format!("create skill returned {status}"));
         }
 
-        // Search
-        match client.get(&format!("/api/skills/search?q={name}")) {
-            Ok((200, body)) if body.to_string().contains(&name) => {}
+        // Search via exact capability filter (SkillQuery uses `capability`,
+        // not a free-text `q` parameter).
+        match client.get(&format!("/api/skills/search?capability={capability}")) {
+            Ok((200, body)) if body.to_string().contains(&capability) => {}
             Ok((200, _)) => return (CheckStatus::Warn, "skill created but not searchable".into()),
             _ => {}
         }

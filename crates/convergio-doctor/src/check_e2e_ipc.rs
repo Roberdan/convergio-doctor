@@ -21,16 +21,16 @@ fn check_ipc_agent_lifecycle() -> CheckResult {
         let client = DoctorHttpClient::new();
         let name = test_name("agent_a");
 
-        // Register
+        // Register (correct endpoint is /api/ipc/agents/register)
         match client.post_json(
-            "/api/ipc/agents",
+            "/api/ipc/agents/register",
             &json!({"name": name, "agent_type": "doctor"}),
         ) {
             Ok((s, _)) if s >= 400 => {
-                // Try alternate registration endpoint
+                // Fallback to catalog so downstream checks still have data
                 if let Err(e) = client.post_json(
                     "/api/agents/catalog",
-                    &json!({"name": name, "role": "doctor-e2e", "agent_type": "doctor"}),
+                    &json!({"name": name, "role": "doctor-e2e", "category": "core_utility"}),
                 ) {
                     return (CheckStatus::Fail, format!("register failed: {e}"));
                 }
@@ -76,11 +76,11 @@ fn check_ipc_messaging() -> CheckResult {
 
         // Register agents
         let _ = client.post_json(
-            "/api/ipc/agents",
+            "/api/ipc/agents/register",
             &json!({"name": sender, "agent_type": "doctor"}),
         );
         let _ = client.post_json(
-            "/api/ipc/agents",
+            "/api/ipc/agents/register",
             &json!({"name": receiver, "agent_type": "doctor"}),
         );
 
@@ -185,7 +185,7 @@ fn check_agent_spawn_via_api() -> CheckResult {
             "/api/agents/spawn",
             &json!({
                 "agent_name": name, "org_id": "_doctor_test_proj",
-                "instructions": "noop — doctor E2E test", "tier": "t4",
+                "instructions": "noop — doctor E2E test", "tier": "t3",
                 "budget_usd": 0, "dry_run": true
             }),
         ) {

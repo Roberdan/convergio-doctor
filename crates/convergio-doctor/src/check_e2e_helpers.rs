@@ -4,13 +4,17 @@
 pub const TEST_PREFIX: &str = "_doctor_test_";
 pub const TEST_SLUG_PREFIX: &str = "doctor-test-";
 
-/// Generate a unique test name with the doctor prefix.
-pub fn test_name(kind: &str) -> String {
-    let ts = std::time::SystemTime::now()
+/// Monotonic-ish millisecond timestamp for unique test identifiers.
+pub fn ts_ms() -> u128 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis();
-    format!("{TEST_PREFIX}{kind}_{ts}")
+        .as_millis()
+}
+
+/// Generate a unique test name with the doctor prefix.
+pub fn test_name(kind: &str) -> String {
+    format!("{TEST_PREFIX}{kind}_{}", ts_ms())
 }
 
 pub(crate) fn matches_test_marker(value: &str) -> bool {
