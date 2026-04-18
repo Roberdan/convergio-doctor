@@ -271,15 +271,16 @@ fn check_mesh_sync_roundtrip(pool: &ConnPool) -> CheckResult {
             return (CheckStatus::Warn, "cannot insert test notification".into());
         }
 
-        // Mesh sync cycle is 35s; poll the peer up to 45s in 5s steps so the
-        // check passes on the first cycle that completes after our insert
-        // instead of failing at a fixed 5s wait that almost never aligns
-        // with the cycle window.
+        // Mesh sync cycle is 30s. The daemon HTTP stack enforces a 30s
+        // per-request timeout, so the check cannot afford to wait a full
+        // cycle — poll up to 15s in 3s steps and fall back to Warn when
+        // the marker misses the current window. The insert is still
+        // cleaned up in every branch.
         let (ip, _) = &peers[0];
         let peer = DoctorHttpClient::with_base(&format!("http://{ip}:8420"));
         let mut last_status: Option<u16> = None;
-        for _ in 0..9 {
-            std::thread::sleep(std::time::Duration::from_secs(5));
+        for _ in 0..5 {
+            std::thread::sleep(std::time::Duration::from_secs(3));
             match peer.get("/api/sync/export?table=notifications&since=2020-01-01") {
                 Ok((200, body)) => {
                     if body.to_string().contains(&marker) {
@@ -300,11 +301,11 @@ fn check_mesh_sync_roundtrip(pool: &ConnPool) -> CheckResult {
             rusqlite::params![marker],
         );
         match last_status {
-            Some(200) => (CheckStatus::Warn, "data not synced within 45s window".into()),
-            Some(s) => (
+            Some(200) => (
                 CheckStatus::Warn,
-                format!("peer sync export returned {s}"),
+                "marker not in peer export within 15s (sync cycle 30s)".into(),
             ),
+            Some(s) => (CheckStatus::Warn, format!("peer sync export returned {s}")),
             None => (CheckStatus::Warn, "peer sync export unavailable".into()),
         }
     })
