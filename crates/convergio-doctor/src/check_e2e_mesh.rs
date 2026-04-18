@@ -47,9 +47,12 @@ fn load_peers_conf() -> HashMap<String, String> {
         if name == "mesh" {
             return;
         }
+        // Prefer tailscale_ip: it works across networks and matches what
+        // the daemon's own mesh stack uses for heartbeat/sync. lan_ip only
+        // helps when both nodes share an L2 segment.
         let addr = fields
-            .get("lan_ip")
-            .or_else(|| fields.get("tailscale_ip"))
+            .get("tailscale_ip")
+            .or_else(|| fields.get("lan_ip"))
             .or_else(|| fields.get("dns_name"))
             .or_else(|| fields.get("ssh_alias"))
             .cloned();
