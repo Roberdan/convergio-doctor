@@ -124,7 +124,15 @@ impl DoctorHttpClient {
 
     pub fn get_no_auth(&self, path: &str) -> Result<(u16, serde_json::Value), String> {
         let url = format!("{}{path}", self.base_url);
-        let resp = self.client.get(&url).send().map_err(|e| e.to_string())?;
+        // X-Forwarded-For makes middleware_auth treat the request as
+        // non-localhost, so the auth gate actually runs (otherwise localhost
+        // is implicitly trusted and every unauthenticated probe succeeds).
+        let resp = self
+            .client
+            .get(&url)
+            .header("x-forwarded-for", "10.0.0.1")
+            .send()
+            .map_err(|e| e.to_string())?;
         let status = resp.status().as_u16();
         let body: serde_json::Value = resp.json().unwrap_or(serde_json::Value::Null);
         Ok((status, body))
@@ -140,6 +148,9 @@ impl DoctorHttpClient {
             .client
             .get(&url)
             .header("Authorization", format!("Bearer {token}"))
+            // Same rationale as get_no_auth: bypass the localhost shortcut so
+            // the daemon actually validates the token.
+            .header("x-forwarded-for", "10.0.0.1")
             .send()
             .map_err(|e| e.to_string())?;
         let status = resp.status().as_u16();
