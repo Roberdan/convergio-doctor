@@ -185,27 +185,42 @@ fn check_mesh_node_sync(pool: &convergio_db::pool::ConnPool) -> CheckResult {
             );
         }
 
-        // Check version alignment
-        let daemon_ver = env!("CARGO_PKG_VERSION");
-        let mismatched: i64 = conn
-            .query_row(
-                "SELECT count(*) FROM peer_heartbeats \
-                 WHERE last_seen > unixepoch() - 600 AND version != ?1",
-                [daemon_ver],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
+        // Version alignment: peers must agree among themselves, not with
+        // the doctor crate. The previous check compared CARGO_PKG_VERSION
+        // (= doctor crate version) against peer-reported convergio-mesh
+        // versions, which are independent and never match.
+        let mut stmt = match conn.prepare(
+            "SELECT version FROM peer_heartbeats \
+             WHERE last_seen > unixepoch() - 600",
+        ) {
+            Ok(s) => s,
+            Err(e) => return (CheckStatus::Fail, format!("DB: {e}")),
+        };
+        let versions: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .ok()
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
 
-        if mismatched > 0 {
+        let unique: std::collections::HashSet<&str> =
+            versions.iter().map(|s| s.as_str()).collect();
+        if unique.len() > 1 {
+            let mut sorted: Vec<&str> = unique.into_iter().collect();
+            sorted.sort();
             return (
                 CheckStatus::Warn,
-                format!("{online}/{total} online, {mismatched} with different version"),
+                format!(
+                    "{online}/{total} online, {} distinct versions: {}",
+                    sorted.len(),
+                    sorted.join(", ")
+                ),
             );
         }
 
+        let ver = versions.first().map(|s| s.as_str()).unwrap_or("?");
         (
             CheckStatus::Pass,
-            format!("{online}/{total} peers online, versions aligned"),
+            format!("{online}/{total} peers online, all on {ver}"),
         )
     })
 }

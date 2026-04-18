@@ -7,6 +7,7 @@ use crate::check_e2e_helpers::{test_name, DoctorHttpClient};
 use crate::checks::{run_check, CheckResult, CheckStatus};
 use convergio_db::pool::ConnPool;
 use serde_json::json;
+use std::collections::HashMap;
 
 pub fn run_e2e_mesh_checks(pool: &ConnPool) -> Vec<CheckResult> {
     vec![
@@ -19,6 +20,70 @@ pub fn run_e2e_mesh_checks(pool: &ConnPool) -> Vec<CheckResult> {
     ]
 }
 
+/// Parse the peers.conf flat-file registry (sections + key=value lines).
+///
+/// Returns a map of peer_name -> address. The address is the first non-empty
+/// of `lan_ip`, `tailscale_ip`, `dns_name`, `ssh_alias`. The peer_name is the
+/// section header (lowercased) AND any *.local hostname derivable from
+/// `dns_name` — both are inserted so heartbeat-reported hostnames like
+/// "Roberdans-MacBook-Pro-M1.local" can be resolved back to an address.
+fn load_peers_conf() -> HashMap<String, String> {
+    let path = std::env::var("CONVERGIO_PEERS_CONF").unwrap_or_else(|_| {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        format!("{home}/.claude/config/peers.conf")
+    });
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return HashMap::new();
+    };
+
+    let mut out: HashMap<String, String> = HashMap::new();
+    let mut current_section: Option<String> = None;
+    let mut fields: HashMap<String, String> = HashMap::new();
+
+    let flush = |section: &Option<String>,
+                 fields: &HashMap<String, String>,
+                 out: &mut HashMap<String, String>| {
+        let Some(name) = section else { return };
+        if name == "mesh" {
+            return;
+        }
+        let addr = fields
+            .get("lan_ip")
+            .or_else(|| fields.get("tailscale_ip"))
+            .or_else(|| fields.get("dns_name"))
+            .or_else(|| fields.get("ssh_alias"))
+            .cloned();
+        let Some(addr) = addr else { return };
+        out.insert(name.to_lowercase(), addr.clone());
+        if let Some(dns) = fields.get("dns_name") {
+            // dns_name like "roberdans-macbook-pro-m1.tail01f12c.ts.net" — the
+            // first label is the hostname; mDNS form is `<hostname>.local`.
+            if let Some(label) = dns.split('.').next() {
+                out.insert(format!("{label}.local").to_lowercase(), addr.clone());
+                out.insert(label.to_lowercase(), addr);
+            }
+        }
+    };
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some(name) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            flush(&current_section, &fields, &mut out);
+            current_section = Some(name.to_string());
+            fields.clear();
+            continue;
+        }
+        if let Some((k, v)) = trimmed.split_once('=') {
+            fields.insert(k.trim().to_string(), v.trim().to_string());
+        }
+    }
+    flush(&current_section, &fields, &mut out);
+    out
+}
+
 fn get_online_peers(client: &DoctorHttpClient) -> Vec<(String, String)> {
     let Ok((200, body)) = client.get("/api/mesh/peers") else {
         return vec![];
@@ -29,20 +94,31 @@ fn get_online_peers(client: &DoctorHttpClient) -> Vec<(String, String)> {
     else {
         return vec![];
     };
+    let registry = load_peers_conf();
     peers
         .iter()
         .filter_map(|p| {
-            let ip = p
-                .get("ip")
-                .or(p.get("address"))
-                .and_then(|v| v.as_str())?
-                .to_string();
             let name = p
-                .get("name")
+                .get("peer")
+                .or(p.get("name"))
                 .or(p.get("hostname"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")
                 .to_string();
+            // Address resolution order: explicit ip/address field on the API
+            // response, then the peers.conf registry keyed by hostname.
+            let ip = p
+                .get("ip")
+                .or(p.get("address"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| registry.get(&name.to_lowercase()).cloned())
+                .or_else(|| {
+                    // Try first label (drop .local suffix) as registry key.
+                    name.split('.')
+                        .next()
+                        .and_then(|n| registry.get(&n.to_lowercase()).cloned())
+                })?;
             let online = p.get("online").and_then(|v| v.as_bool()).unwrap_or(false)
                 || p.get("status").and_then(|v| v.as_str()) == Some("online");
             if online || check_peer_online(&format!("http://{ip}:8420")) {
