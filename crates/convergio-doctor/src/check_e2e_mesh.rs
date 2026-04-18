@@ -20,14 +20,39 @@ pub fn run_e2e_mesh_checks(pool: &ConnPool) -> Vec<CheckResult> {
     ]
 }
 
+/// SSH targets keyed by the same hostname forms as load_peers_conf,
+/// so the SSH check can resolve "Roberdans-MacBook-Pro-M1.local" to its
+/// configured ssh_alias (which carries user@host + identity file via
+/// ~/.ssh/config). Cached at first call.
+fn load_ssh_aliases() -> HashMap<String, String> {
+    parse_peers_conf(|fields| fields.get("ssh_alias").cloned())
+}
+
 /// Parse the peers.conf flat-file registry (sections + key=value lines).
 ///
 /// Returns a map of peer_name -> address. The address is the first non-empty
-/// of `lan_ip`, `tailscale_ip`, `dns_name`, `ssh_alias`. The peer_name is the
+/// of `tailscale_ip`, `lan_ip`, `dns_name`, `ssh_alias`. The peer_name is the
 /// section header (lowercased) AND any *.local hostname derivable from
 /// `dns_name` — both are inserted so heartbeat-reported hostnames like
 /// "Roberdans-MacBook-Pro-M1.local" can be resolved back to an address.
 fn load_peers_conf() -> HashMap<String, String> {
+    parse_peers_conf(|fields| {
+        fields
+            .get("tailscale_ip")
+            .or_else(|| fields.get("lan_ip"))
+            .or_else(|| fields.get("dns_name"))
+            .or_else(|| fields.get("ssh_alias"))
+            .cloned()
+    })
+}
+
+/// Generic peers.conf walker. The `pick` callback selects one field per
+/// section; the section name (lowercase), dns_name first label, and
+/// `<label>.local` are all inserted as keys so heartbeat-reported hostnames
+/// can be resolved.
+fn parse_peers_conf(
+    pick: impl Fn(&HashMap<String, String>) -> Option<String>,
+) -> HashMap<String, String> {
     let path = std::env::var("CONVERGIO_PEERS_CONF").unwrap_or_else(|_| {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         format!("{home}/.claude/config/peers.conf")
@@ -40,30 +65,17 @@ fn load_peers_conf() -> HashMap<String, String> {
     let mut current_section: Option<String> = None;
     let mut fields: HashMap<String, String> = HashMap::new();
 
-    let flush = |section: &Option<String>,
-                 fields: &HashMap<String, String>,
-                 out: &mut HashMap<String, String>| {
+    let mut flush = |section: &Option<String>, fields: &HashMap<String, String>| {
         let Some(name) = section else { return };
         if name == "mesh" {
             return;
         }
-        // Prefer tailscale_ip: it works across networks and matches what
-        // the daemon's own mesh stack uses for heartbeat/sync. lan_ip only
-        // helps when both nodes share an L2 segment.
-        let addr = fields
-            .get("tailscale_ip")
-            .or_else(|| fields.get("lan_ip"))
-            .or_else(|| fields.get("dns_name"))
-            .or_else(|| fields.get("ssh_alias"))
-            .cloned();
-        let Some(addr) = addr else { return };
-        out.insert(name.to_lowercase(), addr.clone());
+        let Some(value) = pick(fields) else { return };
+        out.insert(name.to_lowercase(), value.clone());
         if let Some(dns) = fields.get("dns_name") {
-            // dns_name like "roberdans-macbook-pro-m1.tail01f12c.ts.net" — the
-            // first label is the hostname; mDNS form is `<hostname>.local`.
             if let Some(label) = dns.split('.').next() {
-                out.insert(format!("{label}.local").to_lowercase(), addr.clone());
-                out.insert(label.to_lowercase(), addr);
+                out.insert(format!("{label}.local").to_lowercase(), value.clone());
+                out.insert(label.to_lowercase(), value);
             }
         }
     };
@@ -74,7 +86,7 @@ fn load_peers_conf() -> HashMap<String, String> {
             continue;
         }
         if let Some(name) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-            flush(&current_section, &fields, &mut out);
+            flush(&current_section, &fields);
             current_section = Some(name.to_string());
             fields.clear();
             continue;
@@ -83,7 +95,7 @@ fn load_peers_conf() -> HashMap<String, String> {
             fields.insert(k.trim().to_string(), v.trim().to_string());
         }
     }
-    flush(&current_section, &fields, &mut out);
+    flush(&current_section, &fields);
     out
 }
 
@@ -259,36 +271,41 @@ fn check_mesh_sync_roundtrip(pool: &ConnPool) -> CheckResult {
             return (CheckStatus::Warn, "cannot insert test notification".into());
         }
 
-        // Wait for sync cycle (35s is one cycle, but we check shorter)
-        std::thread::sleep(std::time::Duration::from_secs(5));
-
-        // Check first peer
+        // Mesh sync cycle is 35s; poll the peer up to 45s in 5s steps so the
+        // check passes on the first cycle that completes after our insert
+        // instead of failing at a fixed 5s wait that almost never aligns
+        // with the cycle window.
         let (ip, _) = &peers[0];
         let peer = DoctorHttpClient::with_base(&format!("http://{ip}:8420"));
-        match peer.get("/api/sync/export?table=notifications&since=2020-01-01") {
-            Ok((200, body)) => {
-                let found = body.to_string().contains(&marker);
-                // Cleanup local
-                let _ = conn.execute(
-                    "DELETE FROM notifications WHERE type = ?1",
-                    rusqlite::params![marker],
-                );
-                if found {
-                    (CheckStatus::Pass, "sync roundtrip verified".into())
-                } else {
-                    (
-                        CheckStatus::Warn,
-                        "data not yet synced (may need more time)".into(),
-                    )
+        let mut last_status: Option<u16> = None;
+        for _ in 0..9 {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            match peer.get("/api/sync/export?table=notifications&since=2020-01-01") {
+                Ok((200, body)) => {
+                    if body.to_string().contains(&marker) {
+                        let _ = conn.execute(
+                            "DELETE FROM notifications WHERE type = ?1",
+                            rusqlite::params![marker],
+                        );
+                        return (CheckStatus::Pass, "sync roundtrip verified".into());
+                    }
+                    last_status = Some(200);
                 }
+                Ok((s, _)) => last_status = Some(s),
+                Err(_) => {}
             }
-            _ => {
-                let _ = conn.execute(
-                    "DELETE FROM notifications WHERE type = ?1",
-                    rusqlite::params![marker],
-                );
-                (CheckStatus::Warn, "peer sync export unavailable".into())
-            }
+        }
+        let _ = conn.execute(
+            "DELETE FROM notifications WHERE type = ?1",
+            rusqlite::params![marker],
+        );
+        match last_status {
+            Some(200) => (CheckStatus::Warn, "data not synced within 45s window".into()),
+            Some(s) => (
+                CheckStatus::Warn,
+                format!("peer sync export returned {s}"),
+            ),
+            None => (CheckStatus::Warn, "peer sync export unavailable".into()),
         }
     })
 }
@@ -310,10 +327,24 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
         if peers.is_empty() {
             return (CheckStatus::Warn, "No peers for SSH check".into());
         }
+        // Prefer the ssh_alias from peers.conf (carries User/IdentityFile via
+        // ~/.ssh/config); fall back to the address only when no alias is
+        // configured. A bare tailscale IP usually fails because the daemon
+        // launchd process has no SSH_AUTH_SOCK and no implicit user mapping.
+        let aliases = load_ssh_aliases();
         let mut ok = 0;
         let mut skipped = 0;
-        for (ip, _name) in &peers {
-            if !is_safe_peer_addr(ip) {
+        for (ip, name) in &peers {
+            let target = aliases
+                .get(&name.to_lowercase())
+                .or_else(|| {
+                    name.split('.')
+                        .next()
+                        .and_then(|n| aliases.get(&n.to_lowercase()))
+                })
+                .cloned()
+                .unwrap_or_else(|| ip.clone());
+            if !is_safe_peer_addr(&target) {
                 skipped += 1;
                 continue;
             }
@@ -325,7 +356,7 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
                     "BatchMode=yes",
                     "-o",
                     "StrictHostKeyChecking=accept-new",
-                    ip,
+                    &target,
                     "echo ok",
                 ])
                 .output();
@@ -348,7 +379,7 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
         } else {
             (
                 CheckStatus::Warn,
-                format!("0/{} peers SSH-reachable", peers.len()),
+                format!("0/{} peers SSH-reachable (daemon may lack SSH_AUTH_SOCK)", peers.len()),
             )
         }
     })
