@@ -15,10 +15,21 @@ pub fn run_e2e_security_checks() -> Vec<CheckResult> {
 }
 
 /// Detect if daemon is in dev-mode (auth bypass active).
+///
+/// Reads the flag from /api/health. The previous implementation probed
+/// /api/orgs without a token; that always succeeded because the auth
+/// middleware bypasses localhost (see middleware_auth::is_localhost), so
+/// the doctor — which always runs on localhost — falsely reported
+/// dev-mode even when CONVERGIO_AUTH_TOKEN was configured.
 fn is_dev_mode() -> bool {
     let client = DoctorHttpClient::new();
-    // In dev-mode, unauthenticated requests to protected routes succeed
-    matches!(client.get_no_auth("/api/orgs"), Ok((status, _)) if status < 400)
+    match client.get("/api/health") {
+        Ok((200, body)) => body
+            .get("dev_mode")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        _ => false,
+    }
 }
 
 fn check_auth_health_exempt() -> CheckResult {
