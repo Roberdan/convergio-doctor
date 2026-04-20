@@ -202,8 +202,7 @@ fn check_mesh_node_sync(pool: &convergio_db::pool::ConnPool) -> CheckResult {
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default();
 
-        let unique: std::collections::HashSet<&str> =
-            versions.iter().map(|s| s.as_str()).collect();
+        let unique: std::collections::HashSet<&str> = versions.iter().map(|s| s.as_str()).collect();
         if unique.len() > 1 {
             let mut sorted: Vec<&str> = unique.into_iter().collect();
             sorted.sort();
