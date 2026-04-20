@@ -34,6 +34,7 @@ pub mod check_e2e_smoke_ext;
 pub mod check_e2e_wave_gate;
 pub mod check_integrity;
 pub mod check_projects;
+pub mod check_real_world;
 pub mod check_spec_compliance;
 pub mod checks;
 pub mod ext;

@@ -209,5 +209,10 @@ pub fn run_core_checks(pool: &convergio_db::pool::ConnPool) -> Vec<CheckResult> 
         crate::check_integrity::check_self_containment()
     }));
 
+    // Real-world checks — production failure modes the legacy suite did not
+    // cover. See `check_real_world` module docs for the 2026-04-20 incident
+    // that motivated them.
+    results.extend(crate::check_real_world::run_real_world_checks(pool));
+
     results
 }
