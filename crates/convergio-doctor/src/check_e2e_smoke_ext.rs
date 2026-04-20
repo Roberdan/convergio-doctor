@@ -125,7 +125,10 @@ pub const SMOKE_ROUTES_EXT: &[(&str, &str)] = &[
     ("capabilities", "/api/capabilities/metrics-collection"),
     ("capabilities", "/api/capabilities/model-routing"),
     ("capabilities", "/api/capabilities/network-isolation"),
-    ("capabilities", "/api/capabilities/night-agent-orchestration"),
+    (
+        "capabilities",
+        "/api/capabilities/night-agent-orchestration",
+    ),
     ("capabilities", "/api/capabilities/node-capabilities"),
     ("capabilities", "/api/capabilities/node-provisioning"),
     ("capabilities", "/api/capabilities/notification-queue"),

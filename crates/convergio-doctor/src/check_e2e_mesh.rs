@@ -380,7 +380,10 @@ fn check_delegation_ssh_connectivity() -> CheckResult {
         } else {
             (
                 CheckStatus::Warn,
-                format!("0/{} peers SSH-reachable (daemon may lack SSH_AUTH_SOCK)", peers.len()),
+                format!(
+                    "0/{} peers SSH-reachable (daemon may lack SSH_AUTH_SOCK)",
+                    peers.len()
+                ),
             )
         }
     })
