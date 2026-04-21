@@ -52,9 +52,15 @@ impl DoctorReport {
             .iter()
             .filter(|c| c.status == CheckStatus::Fail)
             .count();
+        // `env!("CARGO_PKG_VERSION")` resolves to the doctor crate, not the
+        // daemon it's linked into. The daemon exports its real version via
+        // the `CONVERGIO_DAEMON_VERSION` env var on startup; fall back to
+        // the doctor version string if the var is missing (e.g. in tests).
+        let daemon_version = std::env::var("CONVERGIO_DAEMON_VERSION")
+            .unwrap_or_else(|_| crate::DOCTOR_VERSION.to_string());
         Self {
             doctor_version: crate::DOCTOR_VERSION.into(),
-            daemon_version: env!("CARGO_PKG_VERSION").into(),
+            daemon_version,
             timestamp: chrono::Utc::now().to_rfc3339(),
             summary: DoctorSummary {
                 total: checks.len(),
