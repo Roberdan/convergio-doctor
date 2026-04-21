@@ -44,9 +44,11 @@ pub fn doctor_routes(pool: ConnPool, runtime: DoctorRuntime) -> Router {
         .route(
             "/api/doctor/version",
             get(|| async {
+                let daemon_version = std::env::var("CONVERGIO_DAEMON_VERSION")
+                    .unwrap_or_else(|_| crate::DOCTOR_VERSION.to_string());
                 Json(json!({
                     "doctor_version": crate::DOCTOR_VERSION,
-                    "daemon_version": env!("CARGO_PKG_VERSION"),
+                    "daemon_version": daemon_version,
                     "check_categories": ["core", "extensions", "beta", "e2e", "chaos"],
                 }))
             }),
