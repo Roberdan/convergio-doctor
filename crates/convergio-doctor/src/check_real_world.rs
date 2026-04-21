@@ -83,26 +83,42 @@ fn mcp_binary_exists() -> (CheckStatus, String) {
     }
 }
 
-/// Daemon and CLI must report identical semver. The existing
-/// `cli_version_match` check greens out when the daemon version is
-/// unreachable; this one fails loudly instead.
+/// Daemon and CLI must report identical semver. Both versions are read
+/// via subprocess — `env!("CARGO_PKG_VERSION")` would resolve to the
+/// doctor crate, not the daemon, so we shell out to both binaries.
 fn cli_daemon_version_match() -> (CheckStatus, String) {
-    let daemon = env!("CARGO_PKG_VERSION");
-    let cli = match std::process::Command::new("cvg").arg("--version").output() {
-        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
-            .split_whitespace()
-            .nth(1)
-            .unwrap_or("")
-            .trim()
-            .to_string(),
-        Ok(_) => return (CheckStatus::Fail, "cvg --version exited non-zero".into()),
-        Err(e) => return (CheckStatus::Warn, format!("cvg not on PATH: {e}")),
+    fn semver_from(cmd: &str) -> Result<String, String> {
+        let out = std::process::Command::new(cmd)
+            .arg("--version")
+            .output()
+            .map_err(|e| format!("{cmd} not on PATH: {e}"))?;
+        if !out.status.success() {
+            return Err(format!("{cmd} --version exited non-zero"));
+        }
+        let raw = String::from_utf8_lossy(&out.stdout);
+        raw.split_whitespace()
+            .find(|t| {
+                t.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                    && t.contains('.')
+            })
+            .map(|s| s.trim_matches('"').to_string())
+            .ok_or_else(|| format!("{cmd} --version: no semver in output"))
+    }
+
+    let cli = match semver_from("cvg") {
+        Ok(v) => v,
+        Err(e) => return (CheckStatus::Warn, e),
     };
+    let daemon = match semver_from("convergio") {
+        Ok(v) => v,
+        Err(e) => return (CheckStatus::Warn, e),
+    };
+
     if cli == daemon {
-        (
-            CheckStatus::Pass,
-            format!("cvg and daemon agree on {daemon}"),
-        )
+        (CheckStatus::Pass, format!("cvg and daemon agree on {cli}"))
     } else {
         (
             CheckStatus::Fail,
