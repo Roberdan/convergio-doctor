@@ -83,38 +83,35 @@ fn mcp_binary_exists() -> (CheckStatus, String) {
     }
 }
 
-/// Daemon and CLI must report identical semver. Both versions are read
-/// via subprocess — `env!("CARGO_PKG_VERSION")` would resolve to the
-/// doctor crate, not the daemon, so we shell out to both binaries.
+/// CLI and the *live* daemon must report identical semver. The daemon
+/// version is read from `/api/health`, not from `convergio --version`
+/// on PATH: a stale binary on disk tells us nothing about the process
+/// currently serving requests (incident 2026-04-23 — PATH binary was
+/// 14 versions behind the daemon actually running).
 fn cli_daemon_version_match() -> (CheckStatus, String) {
-    fn semver_from(cmd: &str) -> Result<String, String> {
-        let out = std::process::Command::new(cmd)
-            .arg("--version")
-            .output()
-            .map_err(|e| format!("{cmd} not on PATH: {e}"))?;
-        if !out.status.success() {
-            return Err(format!("{cmd} --version exited non-zero"));
-        }
-        let raw = String::from_utf8_lossy(&out.stdout);
-        raw.split_whitespace()
-            .find(|t| {
-                t.chars()
-                    .next()
-                    .map(|c| c.is_ascii_digit())
-                    .unwrap_or(false)
-                    && t.contains('.')
-            })
-            .map(|s| s.trim_matches('"').to_string())
-            .ok_or_else(|| format!("{cmd} --version: no semver in output"))
-    }
-
-    let cli = match semver_from("cvg") {
+    let cli = match semver_from_cmd("cvg") {
         Ok(v) => v,
         Err(e) => return (CheckStatus::Warn, e),
     };
-    let daemon = match semver_from("convergio") {
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return (CheckStatus::Warn, format!("cannot build http client: {e}")),
+    };
+    let resp = match client.get("http://localhost:8420/api/health").send() {
+        Ok(r) => r,
+        Err(e) => return (CheckStatus::Warn, format!("daemon unreachable: {e}")),
+    };
+    let body: serde_json::Value = match resp.json() {
         Ok(v) => v,
-        Err(e) => return (CheckStatus::Warn, e),
+        Err(e) => return (CheckStatus::Warn, format!("health body not json: {e}")),
+    };
+    let daemon = match body.get("version").and_then(|v| v.as_str()) {
+        Some(v) => v.to_string(),
+        None => return (CheckStatus::Warn, "health body missing .version".into()),
     };
 
     if cli == daemon {
@@ -125,6 +122,27 @@ fn cli_daemon_version_match() -> (CheckStatus, String) {
             format!("cvg={cli} daemon={daemon} — rebuild CLI"),
         )
     }
+}
+
+fn semver_from_cmd(cmd: &str) -> Result<String, String> {
+    let out = std::process::Command::new(cmd)
+        .arg("--version")
+        .output()
+        .map_err(|e| format!("{cmd} not on PATH: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("{cmd} --version exited non-zero"));
+    }
+    let raw = String::from_utf8_lossy(&out.stdout);
+    raw.split_whitespace()
+        .find(|t| {
+            t.chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+                && t.contains('.')
+        })
+        .map(|s| s.trim_matches('"').to_string())
+        .ok_or_else(|| format!("{cmd} --version: no semver in output"))
 }
 
 /// No plan may be `done` with non-terminal tasks open.
