@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/Roberdan/convergio-doctor/compare/v0.1.11...v0.1.12) (2026-04-23)
+
+
+### Bug Fixes
+
+* **beta:** update mcp_release_sync for post-extraction repo layout ([a528de8](https://github.com/Roberdan/convergio-doctor/commit/a528de8086aed627d30ee2b3a7a8374fba440cb2))
+* **beta:** update mcp_release_sync for post-extraction repo layout ([e71857d](https://github.com/Roberdan/convergio-doctor/commit/e71857d3cd87e5a2136a459d4facae8facbae0dc))
+* **real:** avoid reqwest::blocking in sync check — use env var ([998ff9a](https://github.com/Roberdan/convergio-doctor/commit/998ff9ab5b1ab1b606f58e30c8630506a5f30198))
+* **real:** read daemon version from /api/health ([2343a88](https://github.com/Roberdan/convergio-doctor/commit/2343a882c3608a2c0e96aa49632b340dfd6221a4))
+* **real:** read daemon version from /api/health, not stale PATH binary ([5739509](https://github.com/Roberdan/convergio-doctor/commit/5739509189b31bfb9199fc80d3accb58e96a6da6))
+* **real:** read daemon version from CONVERGIO_DAEMON_VERSION env var ([b5430d4](https://github.com/Roberdan/convergio-doctor/commit/b5430d40ade0fc7e13dd440e612304bfcfc28117))
+
 ## [0.1.11](https://github.com/Roberdan/convergio-doctor/compare/v0.1.10...v0.1.11) (2026-04-21)
 
 
