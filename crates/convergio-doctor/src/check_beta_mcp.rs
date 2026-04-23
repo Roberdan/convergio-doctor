@@ -31,18 +31,17 @@ pub fn check_mcp_release_sync() -> CheckResult {
             .filter(|name| !tool_names.contains(name))
             .collect();
 
+        // Post-extraction (33 separate repos): convergio-mcp lives in its own
+        // repo and publishes independently to crates.io. The convergio-doctor
+        // release workflow cannot `cargo test -p convergio-mcp` (not in its
+        // workspace) nor ship `convergio-mcp-server` (built from another repo).
+        // We only require the local test gate here; cross-crate parity is
+        // enforced by the REQUIRED_TOOLS registry check below.
         let mut issues = Vec::new();
-        for (label, needle) in [
-            (
-                "release gate for convergio-mcp tests",
-                "cargo test -p convergio-mcp --tests",
-            ),
-            (
-                "release gate for convergio-doctor tests",
-                "cargo test -p convergio-doctor --lib --tests",
-            ),
-            ("MCP release artifact", "convergio-mcp-server"),
-        ] {
+        for (label, needle) in [(
+            "release gate for convergio-doctor tests",
+            "cargo test -p convergio-doctor --lib --tests",
+        )] {
             if !RELEASE_WORKFLOW.contains(needle) {
                 issues.push(label.to_string());
             }
@@ -50,7 +49,6 @@ pub fn check_mcp_release_sync() -> CheckResult {
 
         for (label, text, needle) in [
             ("ADR-036", ADR_036, "doctor"),
-            ("ADR-036", ADR_036, "convergio-mcp-server"),
             ("ADR-036", ADR_036, "API, CLI, and MCP"),
             (
                 "getting-started guide",
