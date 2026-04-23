@@ -84,34 +84,28 @@ fn mcp_binary_exists() -> (CheckStatus, String) {
 }
 
 /// CLI and the *live* daemon must report identical semver. The daemon
-/// version is read from `/api/health`, not from `convergio --version`
-/// on PATH: a stale binary on disk tells us nothing about the process
-/// currently serving requests (incident 2026-04-23 — PATH binary was
-/// 14 versions behind the daemon actually running).
+/// version is read from the `CONVERGIO_DAEMON_VERSION` env var, which
+/// the daemon binary sets at boot from its own `CARGO_PKG_VERSION`
+/// (see `convergio-daemon/src/main.rs`). This check runs in-process
+/// inside the daemon, so the env var always reflects the running
+/// binary — no subprocess, no HTTP call, no tokio-runtime clash when
+/// invoked from the sync `run_core_checks` path.
+///
+/// Rationale for not using `convergio --version` on PATH: that binary
+/// can drift arbitrarily far from the process actually serving traffic
+/// (incident 2026-04-23 — PATH binary 14 versions behind the live daemon).
 fn cli_daemon_version_match() -> (CheckStatus, String) {
     let cli = match semver_from_cmd("cvg") {
         Ok(v) => v,
         Err(e) => return (CheckStatus::Warn, e),
     };
-
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => return (CheckStatus::Warn, format!("cannot build http client: {e}")),
-    };
-    let resp = match client.get("http://localhost:8420/api/health").send() {
-        Ok(r) => r,
-        Err(e) => return (CheckStatus::Warn, format!("daemon unreachable: {e}")),
-    };
-    let body: serde_json::Value = match resp.json() {
-        Ok(v) => v,
-        Err(e) => return (CheckStatus::Warn, format!("health body not json: {e}")),
-    };
-    let daemon = match body.get("version").and_then(|v| v.as_str()) {
-        Some(v) => v.to_string(),
-        None => return (CheckStatus::Warn, "health body missing .version".into()),
+    let daemon = match std::env::var("CONVERGIO_DAEMON_VERSION") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return (
+            CheckStatus::Warn,
+            "CONVERGIO_DAEMON_VERSION not set — daemon too old or running outside its main binary"
+                .into(),
+        ),
     };
 
     if cli == daemon {
